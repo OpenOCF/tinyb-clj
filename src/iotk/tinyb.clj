@@ -30,6 +30,19 @@
 (def red-tag   "68:C9:0B:05:C8:87")
 (def green-tag "68:C9:0B:05:BE:02")
 
+(defn bytes->int16
+  ([bytes]
+   (bytes->int16 bytes 0))
+  ([bytes offset]
+   (reduce + 0
+           (map (fn [i]
+                  ;; (let [shift (* (- 2 1 i) 8)]
+                  (let [shift (* i 8)]
+                    (bit-shift-left (bit-and (nth bytes (+ i offset))
+                                             0x00FF)
+                                    shift)))
+                (range 0 2)))))
+
 (def ^:dynamic *running* (atom false))
 
 (def manager (BluetoothManager/getBluetoothManager))
@@ -53,7 +66,7 @@
         (do
           (println "found device " address)
           dev)
-        (if (< i 15)
+        (if (> i 14)
           (do (println "device not found"))
           (do (Thread/sleep 2000)
               (recur (inc i) (.getDevices manager))))))))
@@ -94,7 +107,10 @@
            (Runtime/getRuntime)
            (proxy [Thread] []
              (run []
+               ;; notify workers that we're stopping
                (reset! *running* false)
+               ;; give worker threads time to turn off stuff on the remote
+               (Thread/sleep 2000)
                (.disconnect sensor))))
           sensor)
         (do
@@ -120,18 +136,37 @@
   [raw]
   (/ raw 128.0))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Temperature: TI TMP007 Infrared Thermopile
+;; http://processors.wiki.ti.com/index.php/CC2650_SensorTag_User%27s_Guide#IR_Temperature_Sensor
 (defn read-temps
   [sensor-val sensor-config sensor-period]
   (println "read-temps")
   ;; turn on the Temperature Service
   (.writeValue sensor-config enable)
   (while @*running*
+    ;; two unsigned 16-bit ints:
+    ;; Object[0:7], Object[8:15], Ambience[0:7], Ambience[8:15]
+    ;; "Object" is the source of the infrared input
+    ;; "Ambience" is die temp, whatever that means - the temp of the instrument itself?
     (let [raw-bytes (.readValue sensor-val)]
       (print "Temp raw: {")
       (doseq [b raw-bytes]
         (print (format "%02x" b)))
       (println "}")
 
+      ;; convert to celsius (from the wikipage):
+      ;; void sensorTmp007Convert(uint16_t rawAmbTemp, uint16_t rawObjTemp, float *tAmb, float *tObj) {
+      ;;   const float SCALE_LSB = 0.03125;
+      ;;   float t;
+      ;;   int it;
+      ;;   it = (int)((rawObjTemp) >> 2);
+      ;;   t = ((float)(it)) * SCALE_LSB;
+      ;;   *tObj = t;
+      ;;   it = (int)((rawAmbTemp) >> 2);
+      ;;   t = (float)it;
+      ;;   *tTgt = t * SCALE_LSB; }
+      ;; NB: dunno if the following is correct, it's taken from the tinyb sample code:
       (let [raw-vec (vec raw-bytes)
             _ (println "raw temp vec: " raw-vec)
             object-temp-raw (int (bit-or
@@ -168,19 +203,10 @@
               #_(.disconnect sensor))
             (a/go (read-temps temp-value temp-config temp-period))))))))
 
-(defn bytes->int16
-  ([bytes]
-   (bytes->int16 bytes 0))
-  ([bytes offset]
-   (reduce + 0
-           (map (fn [i]
-                  ;; (let [shift (* (- 2 1 i) 8)]
-                  (let [shift (* i 8)]
-                    (bit-shift-left (bit-and (nth bytes (+ i offset))
-                                             0x00FF)
-                                    shift)))
-                (range 0 2)))))
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Illuminance: TI OPT3001 Digital Ambient Light Sensor (ALS)
+;; http://www.ti.com/product/opt3001
+;; http://processors.wiki.ti.com/index.php/CC2650_SensorTag_User%27s_Guide#Optical_Sensor
 (defn read-lux
   [sensor-val sensor-config sensor-period]
   (println "read-lux")
@@ -193,6 +219,7 @@
         (print (format " 0x%02x" b)))
       (println "}")
 
+      ;; raw->lux
       ;; float sensorOpt3001Convert(uint16_t rawData) {
       ;;   uint16_t e, m;
       ;;   m = rawData & 0x0FFF;
