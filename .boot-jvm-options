@@ -1,0 +1,1 @@
+-ea -esa -Xms512m -Xmx1024m -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -Xverify:none -XX:+UseConcMarkSweepGC -XX:+CMSClassUnloadingEnabled
