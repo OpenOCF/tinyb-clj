@@ -1,7 +1,10 @@
-(ns iotk.tinyb
+(ns tinyb.sensortag
   (:require [clojure.core.async :as a]
             [clojure.math.numeric-tower :as math])
   (:import [tinyb BluetoothDevice BluetoothManager]))
+
+;; TI CC2650 SensorTag User's Guide
+;; http://processors.wiki.ti.com/index.php/CC2650_SensorTag_User%27s_Guide
 
 (def ir-temp-service-id   "F000AA00-0451-4000-B000-000000000000")
 (def ir-temp-data-id      "F000AA01-0451-4000-B000-000000000000")
@@ -55,6 +58,7 @@
 
 (defn get-device
   [address]
+  ;; two methods, the one here and the one using the find method of BluetoothManager
   (loop [i 0
          devices (.getDevices manager)]
     (println "cycle " i)
@@ -70,6 +74,17 @@
           (do (println "device not found"))
           (do (Thread/sleep 2000)
               (recur (inc i) (.getDevices manager))))))))
+
+(defn show-devices
+  []
+  (loop [i 0
+         devices (.getDevices manager)]
+    (println "cycle " i)
+    (doseq [dev devices] (print-device dev))
+    (if (> i 14)
+      nil
+      (do (Thread/sleep 2000)
+          (recur (inc i) (.getDevices manager))))))
 
 (defn get-service
   [device uuid]
@@ -207,6 +222,7 @@
 ;; Illuminance: TI OPT3001 Digital Ambient Light Sensor (ALS)
 ;; http://www.ti.com/product/opt3001
 ;; http://processors.wiki.ti.com/index.php/CC2650_SensorTag_User%27s_Guide#Optical_Sensor
+;; see also http://www.engineeringtoolbox.com/light-level-rooms-d_708.html
 (defn read-lux
   [sensor-val sensor-config sensor-period]
   (println "read-lux")
@@ -265,19 +281,22 @@
       (monitor-temperature sensor)
       (monitor-illuminance sensor))))
 
-(go)
+;; either evaluate (go) or eval the following one-by-one:
+;;(go)
 
-(reset! *running* false)
-(reset! *running* true)
+;; eval this to stop reading:
+;; (reset! *running* false)
+;; eavl this to enable reading:
+;; (reset! *running* true)
 
 ;; (def started (.startDiscovery manager))
 ;; ;; (.stopDiscovery manager)
 
 ;; (println "discovery started? " (str started))
 
+;; temp
 ;; (def sensor (get-connected-sensor red-tag))
-
-;sensor
+; ;sensor
 
 ;; (def temperature-service (get-service sensor ir-temp-service-id))
 ;; (if (nil? temperature-service)
@@ -297,8 +316,7 @@
 ;; ;; run in background
 ;; (a/go (read-temps temp-value temp-config temp-period))
 
-
-;; (monitor-illuminance sensor)
+;; illuminance
 
 ;; (def lux-service (get-service sensor illuminance-service-id))
 

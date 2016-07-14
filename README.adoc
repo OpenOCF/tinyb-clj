@@ -1,0 +1,58 @@
+# tinyb-clj
+Clojure for TinyB Bluetooth LE library
+
+
+== setup
+
+=== intel edison
+
+* clone this repository to your development machine, _not_ the Edison.
+  On the Edison you need to set up the runtime environment but not
+  source code.
+
+On the Edison itself:
+
+* make sure your Java cacerts file is hunky-dory.  See
+  http://blog.mobileink.com/2016/07/java-cacerts-on-intel-edisons-and.html[Java
+  cacerts on Intel Edisons and Gateways].
+
+* install boot
+
+[source,sh]
+----
+sudo bash -c “cd /usr/local/bin && curl -fsSLo boot https://github.com/boot-clj/boot-bin/releases/download/latest/boot.sh && chmod 755 boot”
+----
+
+Then run `$ boot help` - this will cause boot to download its dependencies and install them in the local repo (`~/.m2/repository`).
+
+NOTE:  This takes a *_long_* time the first time 'round.
+
+Then run `$ boot help` again, which will make it update to the latest version.
+
+Emacs users: copy `profile.boot` from this repo (on your dev host
+machine) to `~/.boot` on the Edison; this contains the code needed to use Cider with
+the nREPL.
+
+Others:  see https://github.com/clojure/tools.nrepl[tools.nrepl] for information about using other editors.
+
+* install cmake
+
+[source,sh]
+----
+wget https://cmake.org/files/v3.6/cmake-3.6.0-rc4.tar.gz
+tar -zxvf cmake-3.6.0-rc4.tar.gz
+cd cmake-3.6.0
+bootstrap && make
+make install
+----
+
+* compile and install tinyb:
+
+[source,sh]
+----
+git clone https://github.com/intel-iot-devkit/tinyb.git
+cd tinyb
+mkdir b && cd b
+export JAVA_HOME=/usr/lib64/jvm/java-8-openjdk
+cmake .. -DBUILDJAVA=ON
+----
